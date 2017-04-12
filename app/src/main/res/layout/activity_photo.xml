@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    tools:context="com.infodart.instaproject.ui.PhotoActivity">
+    <android.support.v7.widget.Toolbar
+        android:id="@+id/my_toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/colorPrimary"
+        android:elevation="4dp"
+        android:theme="@style/ToolBarStyle"
+        app:popupTheme="@style/ThemeOverlay.AppCompat.Light"/>
+    <LinearLayout
+        android:visibility="visible"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:id="@+id/layoutGallery"
+        android:orientation="vertical"
+        >
+        <ImageView
+            android:scaleType="fitXY"
+            android:id="@+id/imgImagePreview"
+            android:layout_width="match_parent"
+            android:layout_height="240dp" />
+        <GridView
+            android:numColumns="4"
+            android:layout_weight="1.0"
+            android:id="@+id/gridview"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"></GridView>
+        <android.support.v7.widget.RecyclerView
+            android:visibility="gone"
+            android:layout_weight="1.0"
+            android:layout_below="@id/imgImagePreview"
+            android:id="@+id/gallery"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"></android.support.v7.widget.RecyclerView>
+        </LinearLayout>
+    <RelativeLayout
+        android:visibility="gone"
+        android:id="@+id/layoutCamera"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        >
+        <TextureView
+            android:id="@+id/texture"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+
+            android:layout_alignParentTop="true"/>
+        <ImageButton
+            android:background="@android:color/transparent"
+            android:scaleType="fitXY"
+            android:src="@drawable/click"
+            android:id="@+id/btn_takepicture"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:layout_alignParentBottom="true"
+            android:layout_centerHorizontal="true"
+            android:layout_marginBottom="16dp"
+            android:layout_marginTop="16dp"
+            android:text="Click" />
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:visibility="gone"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:id="@+id/layoutVideo"
+        >
+    </RelativeLayout>
+
+    <android.support.design.widget.BottomNavigationView
+        android:id="@+id/navigation"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="?android:attr/windowBackground"
+        app:menu="@menu/photo" />
+
+</LinearLayout>

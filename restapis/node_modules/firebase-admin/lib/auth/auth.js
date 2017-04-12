@@ -1,0 +1,358 @@
+/*! firebase-admin v4.0.4
+    https://firebase.google.com/terms/ */
+"use strict";
+var token_generator_1 = require('./token-generator');
+var credential_1 = require('./credential');
+var auth_api_request_1 = require('./auth-api-request');
+var user_record_1 = require('./user-record');
+var error_1 = require('../utils/error');
+/**
+ * Gets a Credential from app options.
+ *
+ * @return {Credential}
+ */
+function getCredential(app) {
+    var opts = app.options;
+    if (opts.credential) {
+        return opts.credential;
+    }
+    // We must be careful because '' is falsy. An opt || env test would coalesce '' || undefined as undefined.
+    var certificateOrPath = typeof opts.serviceAccount === 'undefined' ?
+        process.env.GOOGLE_APPLICATION_CREDENTIALS :
+        opts.serviceAccount;
+    if (typeof certificateOrPath === 'string') {
+        return new credential_1.CertCredential(credential_1.Certificate.fromPath(certificateOrPath));
+    }
+    else if (typeof certificateOrPath === 'object') {
+        return new credential_1.CertCredential(new credential_1.Certificate(certificateOrPath));
+    }
+    else {
+        throw new error_1.FirebaseAuthError(error_1.AuthClientErrorCode.INVALID_SERVICE_ACCOUNT);
+    }
+}
+/**
+ * Auth service bound to the provided app.
+ *
+ * @param {Object} app The app for this auth service
+ * @constructor
+ */
+var Auth = (function () {
+    function Auth(app) {
+        if (typeof app !== 'object' || !('options' in app)) {
+            throw new error_1.FirebaseAuthError(error_1.AuthClientErrorCode.INVALID_ARGUMENT, 'First parameter to Auth constructor must be an instance of FirebaseApp');
+        }
+        this.app_ = app;
+        var credential = getCredential(app);
+        if (credential && typeof credential.getAccessToken !== 'function') {
+            throw new error_1.FirebaseAuthError(error_1.AuthClientErrorCode.INVALID_CREDENTIAL, 'Called initializeApp() with an invalid credential parameter');
+        }
+        this.authTokenManager_ = new AuthTokenManager(credential);
+        // TODO (inlined): plumb this into a factory method for tokenGenerator_ once we
+        // can generate custom tokens from access tokens.
+        var serviceAccount;
+        if (typeof credential.getCertificate === 'function') {
+            serviceAccount = credential.getCertificate();
+        }
+        if (serviceAccount) {
+            this.tokenGenerator_ = new token_generator_1.FirebaseTokenGenerator(serviceAccount);
+        }
+        // Initialize auth request handler with the credential.
+        this.authRequestHandler = new auth_api_request_1.FirebaseAuthRequestHandler(credential);
+        // Initialize user record write map (uid to queue).
+        // Firebase auth backend does not lock transactions running on the same user record.
+        // Edits on the same user record could overwrite each other, depending on the last one
+        // to execute.
+        // Multiple create user requests with the same email could create multiple
+        // records where one will always be used depending on the backend lookup algorithm.
+        // This promise queue ensures user record writes are serialized.
+        // TODO(bojeil): Remove this logic (b/32584015) which is currently blocked by b/32556583
+        this.userWriteMap = {};
+    }
+    Object.defineProperty(Auth.prototype, "app", {
+        get: function () {
+            return this.app_;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Auth.prototype, "INTERNAL", {
+        get: function () {
+            return this.authTokenManager_;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    /**
+     * Creates a new custom token that can be sent back to a client to use with
+     * signInWithCustomToken().
+     *
+     * @param {string} uid The uid to use as the JWT subject.
+     * @param {Object=} developerClaims Optional additional claims to include in the JWT payload.
+     *
+     * @return {Promise<string>} A JWT for the provided payload.
+     */
+    Auth.prototype.createCustomToken = function (uid, developerClaims) {
+        if (typeof this.tokenGenerator_ === 'undefined') {
+            throw new error_1.FirebaseAuthError(error_1.AuthClientErrorCode.INVALID_CREDENTIAL, 'Must initialize app with a cert credential to call auth().createCustomToken()');
+        }
+        return this.tokenGenerator_.createCustomToken(uid, developerClaims);
+    };
+    ;
+    /**
+     * Verifies a JWT auth token. Returns a Promise with the tokens claims. Rejects
+     * the promise if the token could not be verified.
+     *
+     * @param {string} idToken The JWT to verify.
+     * @return {Object} A Promise that will be fulfilled after a successful verification.
+     */
+    Auth.prototype.verifyIdToken = function (idToken) {
+        if (typeof this.tokenGenerator_ === 'undefined') {
+            throw new error_1.FirebaseAuthError(error_1.AuthClientErrorCode.INVALID_CREDENTIAL, 'Must initialize app with a cert credential to call auth().verifyIdToken()');
+        }
+        return this.tokenGenerator_.verifyIdToken(idToken);
+    };
+    ;
+    /**
+     * Looks up the user identified by the provided user id and returns a promise that is
+     * fulfilled with a user record for the given user if that user is found.
+     *
+     * @param {string} uid The uid of the user to look up.
+     * @return {Promise<UserRecord>} A promise that resolves with the corresponding user record.
+     */
+    Auth.prototype.getUser = function (uid) {
+        return this.authRequestHandler.getAccountInfoByUid(uid)
+            .then(function (response) {
+            // Returns the user record populated with server response.
+            return new user_record_1.UserRecord(response.users[0]);
+        });
+    };
+    ;
+    /**
+     * Looks up the user identified by the provided email and returns a promise that is
+     * fulfilled with a user record for the given user if that user is found.
+     *
+     * @param {string} email The email of the user to look up.
+     * @return {Promise<UserRecord>} A promise that resolves with the corresponding user record.
+     */
+    Auth.prototype.getUserByEmail = function (email) {
+        return this.authRequestHandler.getAccountInfoByEmail(email)
+            .then(function (response) {
+            // Returns the user record populated with server response.
+            return new user_record_1.UserRecord(response.users[0]);
+        });
+    };
+    ;
+    /**
+     * Creates a new user with the properties provided.
+     *
+     * @param {Object} properties The properties to set on the new user record to be created.
+     * @return {Promise<UserRecord>} A promise that resolves with the newly created user record.
+     */
+    Auth.prototype.createUser = function (properties) {
+        var _this = this;
+        return this.authRequestHandler.createNewAccount(properties)
+            .then(function (uid) {
+            // Return the corresponding user record.
+            return _this.getUser(uid);
+        })
+            .catch(function (error) {
+            if (error.code === 'auth/user-not-found') {
+                // Something must have happened after creating the user and then retrieving it.
+                throw new error_1.FirebaseAuthError(error_1.AuthClientErrorCode.INTERNAL_ERROR, 'Unable to create the user record provided.');
+            }
+            throw error;
+        });
+    };
+    ;
+    /**
+     * Deletes the user identified by the provided user id and returns a promise that is
+     * fulfilled when the user is found and successfully deleted.
+     *
+     * @param {string} uid The uid of the user to delete.
+     * @return {Promise<void>} A promise that resolves when the user is successfully deleted.
+     */
+    Auth.prototype.deleteUser = function (uid) {
+        // Add to queue and wait for it to execute.
+        return this.serializeApiRequest(uid, this.deleteUserUnserialized.bind(this, uid));
+    };
+    ;
+    /**
+     * Updates an existing user with the properties provided.
+     *
+     * @param {string} uid The uid identifier of the user to update.
+     * @param {Object} properties The properties to update on the existing user.
+     * @return {Promise<UserRecord>} A promise that resolves with the modified user record.
+     */
+    Auth.prototype.updateUser = function (uid, properties) {
+        // Add to queue and wait for it to execute.
+        return this.serializeApiRequest(uid, this.updateUserUnserialized.bind(this, uid, properties));
+    };
+    ;
+    /**
+     * Deletes the user identified by the provided user id and returns a promise that is
+     * fulfilled when the user is found and successfully deleted.
+     * This will run without being serialized in the user write queue.
+     *
+     * @param {string} uid The uid of the user to delete.
+     * @return {Promise<void>} A promise that resolves when the user is successfully deleted.
+     */
+    Auth.prototype.deleteUserUnserialized = function (uid) {
+        return this.authRequestHandler.deleteAccount(uid)
+            .then(function (response) {
+            // Return nothing on success.
+        });
+    };
+    ;
+    /**
+     * Updates an existing user with the properties provided.
+     * This will run without being serialized in the user write queue.
+     *
+     * @param {string} uid The uid identifier of the user to update.
+     * @param {Object} properties The properties to update on the existing user.
+     * @return {Promise<UserRecord>} A promise that resolves with the modified user record.
+     */
+    Auth.prototype.updateUserUnserialized = function (uid, properties) {
+        var _this = this;
+        return this.authRequestHandler.updateExistingAccount(uid, properties)
+            .then(function (existingUid) {
+            // Return the corresponding user record.
+            return _this.getUser(existingUid);
+        });
+    };
+    ;
+    /**
+     * @param {string} uid The uid identifier of the request.
+     * @param {() => Promise<any>} boundFn Promise returning function to queue with this
+     *     context and arguments already bound.
+     * @return {Promise<any>} The resulting promise which resolves when all pending previous
+     *     promises on the same user are resolved.
+     */
+    Auth.prototype.serializeApiRequest = function (uid, boundFn) {
+        var _this = this;
+        // Check if there is a pending queue for the current user.
+        // If not initialize one.
+        if (typeof this.userWriteMap[uid] === 'undefined') {
+            this.userWriteMap[uid] = {
+                queue: Promise.resolve(),
+                pending: 0,
+            };
+        }
+        // Increment pending counter for current user.
+        this.userWriteMap[uid].pending++;
+        this.userWriteMap[uid].queue = this.userWriteMap[uid].queue
+            .then(function () {
+            return boundFn();
+        }, function (error) {
+            return boundFn();
+        })
+            .then(function (result) {
+            // Clean up any user specific queues that are no longer pending.
+            if (--_this.userWriteMap[uid].pending === 0) {
+                delete _this.userWriteMap[uid];
+            }
+            // Funnel result back.
+            return result;
+        }, function (error) {
+            // Clean up any user specific queues that are no longer pending.
+            if (--_this.userWriteMap[uid].pending === 0) {
+                delete _this.userWriteMap[uid];
+            }
+            // Rethrow error.
+            throw error;
+        });
+        return this.userWriteMap[uid].queue;
+    };
+    ;
+    return Auth;
+}());
+exports.Auth = Auth;
+;
+var FirebaseAccessToken = (function () {
+    function FirebaseAccessToken() {
+    }
+    return FirebaseAccessToken;
+}());
+exports.FirebaseAccessToken = FirebaseAccessToken;
+var AuthTokenManager = (function () {
+    function AuthTokenManager(credential) {
+        this.credential = credential;
+        this.tokenListeners = [];
+    }
+    /**
+     * Deletes the service and its associated resources.
+     *
+     * @return {Promise<()>} An empty Promise that will be fulfilled when the service is deleted.
+     */
+    AuthTokenManager.prototype.delete = function () {
+        // There are no resources to clean up
+        return Promise.resolve(undefined);
+    };
+    /**
+     * Gets an auth token for the associated app.
+     *
+     * @param {boolean} forceRefresh Whether or not to force a token refresh.
+     * @return {Promise<Object>} A Promise that will be fulfilled with the current or new token.
+     */
+    AuthTokenManager.prototype.getToken = function (forceRefresh) {
+        var _this = this;
+        var expired = this.cachedToken && this.cachedToken.expirationTime < Date.now();
+        if (this.cachedToken && !forceRefresh && !expired) {
+            return Promise.resolve(this.cachedToken);
+        }
+        else {
+            // credential may be an external class; resolving it in a promise helps us
+            // protect against exceptions and upgrades the result to a promise in all cases.
+            return Promise.resolve()
+                .then(function () {
+                return _this.credential.getAccessToken();
+            })
+                .then(function (result) {
+                if (result === null) {
+                    return null;
+                }
+                // Since the customer can provide the credential implementation, we want to weakly verify
+                // the return type until the type is properly exported.
+                if (typeof result !== 'object' ||
+                    typeof result.expires_in !== 'number' ||
+                    typeof result.access_token !== 'string') {
+                    throw new error_1.FirebaseAuthError(error_1.AuthClientErrorCode.INVALID_CREDENTIAL, 'initializeApp() was called with a credential ' +
+                        'that creates invalid access tokens: ' + JSON.stringify(result));
+                }
+                var token = {
+                    accessToken: result.access_token,
+                    expirationTime: Date.now() + (result.expires_in * 1000),
+                };
+                var hasAccessTokenChanged = (_this.cachedToken && _this.cachedToken.accessToken !== token.accessToken);
+                var hasExpirationChanged = (_this.cachedToken && _this.cachedToken.expirationTime !== token.expirationTime);
+                if (!_this.cachedToken || hasAccessTokenChanged || hasExpirationChanged) {
+                    _this.cachedToken = token;
+                    _this.tokenListeners.forEach(function (listener) {
+                        listener(token.accessToken);
+                    });
+                }
+                return token;
+            });
+        }
+    };
+    /**
+     * Adds a listener that is called each time a token changes.
+     *
+     * @param {function(string)} listener The listener that will be called with each new token.
+     */
+    AuthTokenManager.prototype.addAuthTokenListener = function (listener) {
+        this.tokenListeners.push(listener);
+        if (this.cachedToken) {
+            listener(this.cachedToken.accessToken);
+        }
+    };
+    /**
+     * Removes a token listener.
+     *
+     * @param {function(string)} listener The listener to remove.
+     */
+    AuthTokenManager.prototype.removeAuthTokenListener = function (listener) {
+        this.tokenListeners = this.tokenListeners.filter(function (other) { return other !== listener; });
+    };
+    return AuthTokenManager;
+}());
+exports.AuthTokenManager = AuthTokenManager;

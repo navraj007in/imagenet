@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:visible="false"
+        android:id="@+id/navigation_post"
+        android:icon="@drawable/post"
+        android:title="@string/title_home"
+        app:showAsAction="never"/>
+
+    <item
+        android:id="@+id/menu_camera"
+        android:icon="@drawable/camera"
+        android:title="@string/title_dashboard"
+        app:showAsAction="always"/>
+
+
+</menu>
