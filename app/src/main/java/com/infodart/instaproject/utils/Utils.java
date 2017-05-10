@@ -2,6 +2,7 @@ package com.infodart.instaproject.utils;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.util.Log;
 import android.widget.Toast;
@@ -10,16 +11,22 @@ import com.infodart.instaproject.config.Constants;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.OutputStreamWriter;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -94,7 +101,49 @@ public class Utils {
         scanIntent.setData(contentUri);
         context.sendBroadcast(scanIntent);
     }
-    public static void WriteToFile(String data,Context context) {
+
+    public static void WriteObjectToFile(String fileName,Object object,Context context) {
+        try {
+            FileOutputStream fileOutputStream = new FileOutputStream(fileName);
+            ObjectOutputStream objectOutputStream = new ObjectOutputStream(fileOutputStream);
+
+            objectOutputStream.writeObject(object);
+            objectOutputStream.close();
+        }
+        catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+    public static Object ReadObjectFromFile(String fileName,Context context) {
+        try {
+            FileInputStream fileInputStream = new FileInputStream(fileName);
+            ObjectInputStream objectInputStream = new ObjectInputStream(fileInputStream);
+
+            Object object = objectInputStream.readObject();
+            return  object;
+            //Map myNewlyReadInMap = (HashMap) objectInputStream.readObject();
+            //objectInputStream.close();
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+    public static void WriteToFile(String fileName,String data,Context context) {
+        try {
+            OutputStreamWriter outputStreamWriter = new OutputStreamWriter(
+                    context.openFileOutput(fileName, Context.MODE_PRIVATE));
+            outputStreamWriter.write(data);
+            outputStreamWriter.close();
+        }
+        catch (IOException e) {
+            Logger.e("Exception", "File write failed: " + e.toString());
+        }
+    }
+
+    public static void WriteToFile1(String data,Context context) {
         try {
             OutputStreamWriter outputStreamWriter = new OutputStreamWriter(
                     context.openFileOutput("feed.txt", Context.MODE_PRIVATE));
@@ -106,12 +155,12 @@ public class Utils {
         }
     }
 
-    public static String ReadFromFile(Context context) {
+    public static String ReadFromFile(Context context,String fileName) {
 
         String ret = "";
 
         try {
-            InputStream inputStream = context.openFileInput("feed.txt");
+            InputStream inputStream = context.openFileInput(fileName);
 
             if ( inputStream != null ) {
                 InputStreamReader inputStreamReader = new InputStreamReader(inputStream);
@@ -151,5 +200,17 @@ public class Utils {
     }
     public static void ShowToast(Context context,String message) {
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
+    }
+    public static void WritePreference(Context context,String prefName,String prefValue) {
+        SharedPreferences sharedPref = context.getSharedPreferences("followers",Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPref.edit();
+        editor.putString(prefName, prefValue);
+        editor.commit();
+    }
+
+    public static String ReadPreference(Context context,String prefName) {
+        SharedPreferences sharedPref = context.getSharedPreferences("followers",Context.MODE_PRIVATE);
+
+        return sharedPref.getString(prefName,"");
     }
 }

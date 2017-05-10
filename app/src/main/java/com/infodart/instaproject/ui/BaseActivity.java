@@ -14,7 +14,7 @@ import com.infodart.instaproject.R;
 
 public class BaseActivity extends AppCompatActivity {
     private FirebaseAuth mFirebaseAuth;
-    private FirebaseUser mFirebaseUser;
+    protected FirebaseUser mFirebaseUser;
     private DatabaseReference mDatabase;
     public String mUserId;
 
@@ -34,6 +34,7 @@ public class BaseActivity extends AppCompatActivity {
             startActivity(intent);
         } else {
             mUserId = mFirebaseUser.getUid();
+
             Log.e("Firebase",mUserId);
 
         }

@@ -27,6 +27,7 @@ public class Post {
     private String publisher;
     private String publisherName;
     private String publisherImage;
+
     public HashMap<String, Integer> likesMap;
 
     public String getComments() {
@@ -96,12 +97,12 @@ public class Post {
                 post.setTimestamp(jsonObject.getString("timestamp"));
             if(jsonObject.has("likesCount"))
                 post.setLikesCount(jsonObject.getInt("likesCount"));
-            if(jsonObject.has("commentsCount"))
-                post.setCommentsCount(jsonObject.getInt("commentsCount"));
-            if(jsonObject.has("comments"))
-                post.setComments(jsonObject.getString("comments"));
-            if(jsonObject.has("publisher"))
-                post.setPublisher(jsonObject.getString("publisher"));
+            if(jsonObject.has("commentCount"))
+                post.setCommentsCount(jsonObject.getInt("commentCount"));
+            if(jsonObject.has("reactions"))
+                post.setComments(jsonObject.getString("reactions"));
+            if(jsonObject.has("uid"))
+                post.setPublisher(jsonObject.getString("uid"));
             if(jsonObject.has("publisher"))
                 publisherData = jsonObject.getString("publisher_data") ;
 
@@ -179,7 +180,7 @@ public class Post {
     }
 
     public String getPostedbyId() {
-        return postedbyId;
+        return publisherName;
     }
 
     public void setPostedbyId(String postedbyId) {

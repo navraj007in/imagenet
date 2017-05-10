@@ -32,8 +32,12 @@ import com.infodart.instaproject.R;
 import com.infodart.instaproject.config.Constants;
 import com.infodart.instaproject.interfaces.OnLoadMoreListener;
 import com.infodart.instaproject.model.Post;
+import com.infodart.instaproject.ui.BaseActivity;
+import com.infodart.instaproject.ui.CommentActivity;
+import com.infodart.instaproject.ui.CommentsActivity;
 import com.infodart.instaproject.ui.InstaHome;
 import com.infodart.instaproject.ui.PostActivity;
+import com.infodart.instaproject.ui.WallActivity;
 import com.infodart.instaproject.utils.Logger;
 import com.infodart.instaproject.utils.TimeAgo;
 import com.infodart.instaproject.utils.Utils;
@@ -55,9 +59,15 @@ public class PostAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
     private Context context;
     private ImageLoader mImageLoader;
     public HashMap<String,Integer> likesMap;
+
+    private final int VIEW_ITEM = 1;
+    private final int VIEW_PROG = 0;
+
+    private boolean loading;
+    private OnLoadMoreListener onLoadMoreListener;
+
     public PostAdapter(Context context) {
         this.context = context;
-
     }
     public PostAdapter(Context context, ArrayList<Post> posts,RecyclerView recyclerView,HashMap<String,Integer> likesMap) {
         this.context = context;
@@ -66,31 +76,34 @@ public class PostAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
         mImageLoader = VolleySingleton.getInstance(context).getImageLoader();
         this.likesMap = likesMap;
 
-        final LinearLayoutManager linearLayoutManager = (LinearLayoutManager) mRecyclerView.getLayoutManager();
-        recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
-            @Override
-            public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
-                super.onScrollStateChanged(recyclerView, newState);
-            }
+        if (recyclerView.getLayoutManager() instanceof LinearLayoutManager) {
 
-            @Override
-            public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
-                super.onScrolled(recyclerView, dx, dy);
-                super.onScrolled(recyclerView, dx, dy);
+            final LinearLayoutManager linearLayoutManager = (LinearLayoutManager) recyclerView
+                    .getLayoutManager();
 
-/*
-                totalItemCount = linearLayoutManager.getItemCount();
-                lastVisibleItem = linearLayoutManager.findLastVisibleItemPosition();
 
-                if (!isLoading && totalItemCount <= (lastVisibleItem + visibleThreshold)) {
-                    if (mOnLoadMoreListener != null) {
-                        mOnLoadMoreListener.onLoadMore();
-                    }
-                    isLoading = true;
-                }
-*/
-            }
-        });
+            recyclerView
+                    .addOnScrollListener(new RecyclerView.OnScrollListener() {
+                        @Override
+                        public void onScrolled(RecyclerView recyclerView,
+                                               int dx, int dy) {
+                            super.onScrolled(recyclerView, dx, dy);
+
+                            totalItemCount = linearLayoutManager.getItemCount();
+                            lastVisibleItem = linearLayoutManager
+                                    .findLastVisibleItemPosition();
+                            if (!loading
+                                    && totalItemCount <= (lastVisibleItem + visibleThreshold)) {
+                                // End has been reached
+                                // Do something
+                                if (onLoadMoreListener != null) {
+                                    onLoadMoreListener.onLoadMore();
+                                }
+                                loading = true;
+                            }
+                        }
+                    });
+        }
     }
 
     /*@Override
@@ -118,7 +131,7 @@ public class PostAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
             }
             Linkify.addLinks(mainHolder.text, Linkify.ALL);
 
-            mainHolder.layoutPost.setOnClickListener(new View.OnClickListener() {
+            mainHolder.imgFresco.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
 
@@ -129,6 +142,28 @@ public class PostAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
                 }
             });
 
+            mainHolder.name.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    Intent intent = new Intent(context, WallActivity.class);
+                    intent.putExtra("userid",model.getPublisher());
+                    intent.putExtra("name",model.getPublisherName());
+
+                    context.startActivity(intent);
+
+                }
+            });
+            mainHolder.name.setText(model.getPublisherName());
+            mainHolder.imgComment.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    Intent intent = new Intent(context, CommentsActivity.class);
+                    intent.putExtra("id",model.get_id());
+                    intent.putExtra("comments",model.getComments());
+
+                    context.startActivity(intent);
+                }
+            });
             Uri imageUri = Uri.parse(model.getUrl());
             mainHolder.imgFresco.setImageURI(imageUri);
             mainHolder.imgLike.setOnClickListener(new View.OnClickListener() {
@@ -152,7 +187,7 @@ public class PostAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
                     int op = 0;
                     if(model.getLiked())
                         op = 1;
-                    executeLike(model.get_id(),op,"");
+                    executeLike(model.get_id(),op);
                     notifyDataSetChanged();
                 }
             });
@@ -194,33 +229,30 @@ public class PostAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
             LoadingViewHolder loadingViewHolder = (LoadingViewHolder) holder;
             loadingViewHolder.progressBar.setIndeterminate(true);
         }
-
-
-    }
-    @Override
-    public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup viewGroup, int viewType) {
-        // This method will inflate the custom layout and return as viewholder
-        LayoutInflater mInflater = LayoutInflater.from(viewGroup.getContext());
-        ViewGroup mainGroup ;
-        if (viewType == VIEW_TYPE_ITEM) {
-            //View view = LayoutInflater.from(context).inflate(R.layout.postrow, parent, false);
-            mainGroup = (ViewGroup) mInflater.inflate(
-                    R.layout.postrow, viewGroup, false);;
-            PostAdapter.PostViewHolder listHolder = new PostAdapter.PostViewHolder(mainGroup);
-            return listHolder;
-            //return new UserViewHolder(view);
-        } else if (viewType == VIEW_TYPE_LOADING) {
-            View view = LayoutInflater.from(context).inflate(R.layout.load_more, viewGroup, false);
-            return new LoadingViewHolder(view);
-            //View view = LayoutInflater.from(MainActivity.this).inflate(R.layout.layout_loading_item, parent, false);
-            //return new LoadingViewHolder(view);
+        else {
+            ((DataAdapter.ProgressViewHolder) holder).progressBar.setIndeterminate(true);
         }
 
 
 
+    }
 
-        return null;
+    @Override
+    public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent,
+                                                      int viewType) {
+        RecyclerView.ViewHolder vh;
+        if (viewType == VIEW_ITEM) {
+            View v = LayoutInflater.from(parent.getContext()).inflate(
+                    R.layout.postrow, parent, false);
 
+            vh = new PostAdapter.PostViewHolder(v);
+        } else {
+            View v = LayoutInflater.from(parent.getContext()).inflate(
+                    R.layout.progressbar, parent, false);
+
+            vh = new DataAdapter.ProgressViewHolder(v);
+        }
+        return vh;
     }
 
     static class LoadingViewHolder extends RecyclerView.ViewHolder {
@@ -244,6 +276,7 @@ public class PostAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
         public SimpleDraweeView imgFresco;
         public SimpleDraweeView imgFrescoStar;
         public ImageView imgLike;
+        public ImageView imgComment;
         public PostViewHolder(View view) {
             super(view);
             // Find all views ids
@@ -253,6 +286,7 @@ public class PostAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
             this.imgFrescoStar = (SimpleDraweeView) view.findViewById(R.id.sdvStar);
             this.layoutPost = (LinearLayout) view.findViewById(R.id.layoutPost);
             this.imgLike = (ImageView) view.findViewById(R.id.imgLike);
+            this.imgComment = (ImageView) view.findViewById(R.id.imgComment);
 
             this.name = (TextView) view
                     .findViewById(R.id.lblStarName);
@@ -275,10 +309,10 @@ public class PostAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
     public void setOnLoadMoreListener(OnLoadMoreListener mOnLoadMoreListener) {
         this.mOnLoadMoreListener = mOnLoadMoreListener;
     }
-    @Override public int getItemViewType(int position) {
-        return posts.get(position) == null ? VIEW_TYPE_LOADING : VIEW_TYPE_ITEM;
+    @Override
+    public int getItemViewType(int position) {
+        return posts.get(position) != null ? VIEW_ITEM : VIEW_PROG;
     }
-
     @Override
     public int getItemCount() {
         return posts == null ? 0 : posts.size();
@@ -293,9 +327,11 @@ public class PostAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
         Logger.e(postsString);
     }
 
-    private void executeLike(String postId,int op,String userId) {
+    private void executeLike(String postId,int op) {
+        String userid = ((BaseActivity)context).mUserId;
+
         String url  = String.format(Constants.GetServerURL() +
-                        Constants.URL_POSTS + "/%s/like/?op=%d",postId, op);
+                        Constants.URL_POSTS + Constants.URL_LIKES,postId, op,userid);
         Request request = VolleySingleton.getInstance(context).getStringRequest(Request.Method.GET, url, new Response.Listener<String>() {
             @Override
             public void onResponse(String response) {
@@ -305,7 +341,7 @@ public class PostAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>{
             @Override
             public void onErrorResponse(VolleyError error) {
                 error.printStackTrace();
-                Logger.e(error.getMessage());
+               // Logger.e(error.getMessage());
 
             }
         });

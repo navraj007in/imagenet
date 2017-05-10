@@ -22,10 +22,17 @@
         android:layout_height="0dp"
         android:layout_weight="1">
 
-        <android.support.v7.widget.RecyclerView
-            android:id="@+id/recyclerView"
+        <fragment class="com.infodart.instaproject.fragments.FeedsFragment" xmlns:app="http://schemas.android.com/apk/res-auto"
+            android:id="@+id/fragfeeds"
+            android:visibility="gone"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"></android.support.v7.widget.RecyclerView>
+            android:layout_height="wrap_content" />
+
+        <fragment class="com.infodart.instaproject.fragments.UsersFragment" xmlns:app="http://schemas.android.com/apk/res-auto"
+            android:id="@+id/fragusers"
+            android:visibility="gone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
         <TextView
             android:visibility="gone"
             android:id="@+id/message"

@@ -1,0 +1,9 @@
+ to connect to database
+ use dbname
+
+ to set integer field 0
+ db.profiles.update({}, { $set : {'followers': 0 }} , {multi:true} )
+
+to set an array empty
+
+db.profiles.update({}, { $set : {'following': [] }} , {multi:true} )

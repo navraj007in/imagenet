@@ -13,8 +13,11 @@ import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthResult;
@@ -25,11 +28,16 @@ import com.infodart.instaproject.R;
 import com.infodart.instaproject.config.Constants;
 import com.infodart.instaproject.utils.Logger;
 import com.infodart.instaproject.utils.Utils;
+import com.infodart.instaproject.utils.VolleySingleton;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
 
 import static com.infodart.instaproject.ui.SignupActivity.ERROR_CODES.AGE_TOO_LOW;
 import static com.infodart.instaproject.ui.SignupActivity.ERROR_CODES.PASSWORDS_DO_NOT_MATCH;
@@ -51,7 +59,8 @@ public class LoginActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private Button btnSignup, btnLogin, btnReset;
     private static final int INSTA_PERMISSIONS_REQUEST = 101;
-
+    FirebaseAuth mFirebaseAuth;
+    FirebaseUser mFirebaseUser;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -154,7 +163,9 @@ public class LoginActivity extends AppCompatActivity {
                                 Toast.makeText(LoginActivity.this, getString(R.string.auth_failed), Toast.LENGTH_LONG).show();
                             }
                         } else {
-
+                            mFirebaseAuth = FirebaseAuth.getInstance();
+                            mFirebaseUser = mFirebaseAuth.getCurrentUser();
+                            loadProfile(mFirebaseUser.getUid());
                             Intent intent = new Intent(LoginActivity.this, InstaHome.class);
                             startActivity(intent);
                             finish();
@@ -240,6 +251,51 @@ public class LoginActivity extends AppCompatActivity {
         return true;
     }
 
+    private void loadProfile(String _id) {
+        String url = String.format(Constants.GetServerURL() + Constants.URL_USERS +
+                Constants.URL_USER_PROFILE,_id);
+        InstaHome.followersMap = new HashMap<>();
+
+        Logger.v("URL-"+url);
+
+        StringRequest stringRequest = new StringRequest(Request.Method.GET, url,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        // Do something with the response
+                        Utils.WriteToFile(Constants.FILE_PROFILE,response,LoginActivity.this);
+                        Logger.d("Got Response - "+response+ "-Wrote To File");
+
+                        try {
+                            JSONObject jsonObject = new JSONObject(response);
+                            JSONArray jsonFollowing = new JSONArray("following");
+                            for(int i=0;i<jsonFollowing.length();i++) {
+                                InstaHome.followersMap.put(jsonFollowing.getString(i),1);
+                            }
+                            Utils.WriteObjectToFile("followers",InstaHome.followersMap,LoginActivity.this);
+                            //String followers = jsonObject.getString("");
+                        }
+                        catch (Exception e){
+                            e.printStackTrace();
+                        }
+
+                    }
+                },
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        // Handle error
+                        error.printStackTrace();
+                    }
+                });
+
+        RequestQueue queue = VolleySingleton.getInstance(getApplicationContext()).
+                getRequestQueue();
+
+        VolleySingleton.getInstance(this).addToRequestQueue(stringRequest);
+        //queue.add(stringRequest);
+
+    }
     @Override
     public void onRequestPermissionsResult(int requestCode,
                                            String permissions[], int[] grantResults) {

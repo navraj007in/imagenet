@@ -9,6 +9,7 @@ import android.text.Html;
 import android.text.method.LinkMovementMethod;
 import android.text.util.Linkify;
 import android.view.MenuItem;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -31,7 +32,7 @@ public class PostActivity extends AppCompatActivity {
     public NetworkImageView imgStar;
     public NetworkImageView imgUrl;
     public SimpleDraweeView imgFresco;
-    public SimpleDraweeView imgFrescoStar;
+    public ImageView imgFrescoStar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,7 +48,7 @@ public class PostActivity extends AppCompatActivity {
 
     private void init() {
         this.imgFresco = (SimpleDraweeView) findViewById(R.id.sdvImage);
-        this.imgFrescoStar = (SimpleDraweeView) findViewById(R.id.sdvStar);
+        this.imgFrescoStar = (ImageView) findViewById(R.id.sdvStar);
 
         this.name = (TextView) findViewById(R.id.lblStarName);
         this.timestamp = (TextView) findViewById(R.id.timestamp);
